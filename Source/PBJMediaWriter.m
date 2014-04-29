@@ -3,7 +3,25 @@
 //  Vision
 //
 //  Created by Patrick Piemonte on 1/27/14.
-//  Copyright (c) 2014 Patrick Piemonte. All rights reserved.
+//
+//  Copyright (c) 2013-2014 Patrick Piemonte (http://patrickpiemonte.com)
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy of
+//  this software and associated documentation files (the "Software"), to deal in
+//  the Software without restriction, including without limitation the rights to
+//  use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+//  the Software, and to permit persons to whom the Software is furnished to do so,
+//  subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+//  FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+//  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+//  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+//  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
 #import "PBJMediaWriter.h"
@@ -68,7 +86,7 @@
     self = [super init];
     if (self) {
         NSError *error = nil;
-        _assetWriter = [[AVAssetWriter alloc] initWithURL:outputURL fileType:(NSString *)kUTTypeQuickTimeMovie error:&error];
+        _assetWriter = [[AVAssetWriter alloc] initWithURL:outputURL fileType:(NSString *)kUTTypeMPEG4 error:&error];
         if (error) {
             DLog(@"error setting up the asset writer (%@)", error);
             _assetWriter = nil;
@@ -141,9 +159,9 @@
 		_assetWriterAudioIn = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeAudio outputSettings:audioSettings];
 		_assetWriterAudioIn.expectsMediaDataInRealTime = YES;
         
-        DLog(@"prepared audio-in with compression settings sampleRate (%f) channels (%d) bitRate (%ld)",
+        DLog(@"prepared audio-in with compression settings sampleRate (%f) channels (%lu) bitRate (%ld)",
                     [[audioSettings objectForKey:AVSampleRateKey] floatValue],
-                    [[audioSettings objectForKey:AVNumberOfChannelsKey] unsignedIntegerValue],
+                    (unsigned long)[[audioSettings objectForKey:AVNumberOfChannelsKey] unsignedIntegerValue],
                     (long)[[audioSettings objectForKey:AVEncoderBitRateKey] integerValue]);
         
 		if ([_assetWriter canAddInput:_assetWriterAudioIn]) {
@@ -250,10 +268,7 @@
     [_assetWriter finishWritingWithCompletionHandler:handler];
     
     _audioReady = NO;
-    _videoReady = NO;
-    
-    _audioTimestamp = kCMTimeInvalid;
-    _videoTimestamp = kCMTimeInvalid;
+    _videoReady = NO;    
 }
 
 

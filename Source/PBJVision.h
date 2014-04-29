@@ -1,8 +1,27 @@
 //
 //  PBJVision.h
+//  Vision
 //
 //  Created by Patrick Piemonte on 4/30/13.
-//  Copyright (c) 2013. All rights reserved.
+//
+//  Copyright (c) 2013-2014 Patrick Piemonte (http://patrickpiemonte.com)
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy of
+//  this software and associated documentation files (the "Software"), to deal in
+//  the Software without restriction, including without limitation the rights to
+//  use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+//  the Software, and to permit persons to whom the Software is furnished to do so,
+//  subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+//  FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+//  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+//  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+//  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
 #import <Foundation/Foundation.h>
@@ -33,6 +52,12 @@ typedef NS_ENUM(NSInteger, PBJFocusMode) {
     PBJFocusModeContinuousAutoFocus = AVCaptureFocusModeContinuousAutoFocus
 };
 
+typedef NS_ENUM(NSInteger, PBJExposureMode) {
+    PBJExposureModeLocked = AVCaptureExposureModeLocked,
+    PBJExposureModeAutoExpose = AVCaptureExposureModeAutoExpose,
+    PBJExposureModeContinuousAutoExposure = AVCaptureExposureModeContinuousAutoExposure
+};
+
 typedef NS_ENUM(NSInteger, PBJFlashMode) {
     PBJFlashModeOff  = AVCaptureFlashModeOff,
     PBJFlashModeOn   = AVCaptureFlashModeOn,
@@ -51,6 +76,16 @@ typedef NS_ENUM(NSInteger, PBJOutputFormat) {
     PBJOutputFormatWidescreen
 };
 
+// PBJError
+
+extern NSString * const PBJVisionErrorDomain;
+
+typedef NS_ENUM(NSInteger, PBJVisionErrorType)
+{
+    PBJVisionErrorUnknown = -1,
+    PBJVisionErrorCancelled = 100
+};
+
 // photo dictionary keys
 
 extern NSString * const PBJVisionPhotoMetadataKey;
@@ -66,8 +101,6 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 @class EAGLContext;
 @protocol PBJVisionDelegate;
 @interface PBJVision : NSObject
-{
-}
 
 + (PBJVision *)sharedInstance;
 
@@ -84,18 +117,20 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 @property (nonatomic) PBJCameraDevice cameraDevice;
 - (BOOL)isCameraDeviceAvailable:(PBJCameraDevice)cameraDevice;
 
-@property (nonatomic) PBJFocusMode focusMode;
-
 @property (nonatomic) PBJFlashMode flashMode; // flash and torch
 @property (nonatomic, readonly, getter=isFlashAvailable) BOOL flashAvailable;
 
 // video output/compression settings
 
-@property (nonatomic) PBJOutputFormat outputFormat;
-@property (nonatomic) CGFloat videoAssetBitRate;
-@property (nonatomic) NSInteger audioAssetBitRate;
-@property (nonatomic) NSInteger videoAssetFrameInterval;
 @property (nonatomic, strong) NSString *captureSessionPreset;
+@property (nonatomic) PBJOutputFormat outputFormat;
+@property (nonatomic) CGFloat videoBitRate;
+@property (nonatomic) NSInteger audioBitRate;
+
+// video frame rate (adjustment may change the capture format (AVCaptureDeviceFormat : FoV, zoom factor, etc)
+
+@property (nonatomic) NSInteger videoFrameRate; // desired fps for active cameraDevice
+- (BOOL)supportsVideoFrameRate:(NSInteger)videoFrameRate;
 
 // preview
 
@@ -107,16 +142,26 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 
 - (void)unfreezePreview; // preview is automatically timed and frozen with photo capture
 
-// focus
+// focus, exposure, white balance
 
-- (void)focusAtAdjustedPoint:(CGPoint)adjustedPoint;
+// note: focus and exposure modes change when adjusting on point
+- (BOOL)isFocusPointOfInterestSupported;
+- (void)focusExposeAndAdjustWhiteBalanceAtAdjustedPoint:(CGPoint)adjustedPoint;
+
+@property (nonatomic) PBJFocusMode focusMode;
+@property (nonatomic, readonly, getter=isFocusLockSupported) BOOL focusLockSupported;
+- (void)focusAtAdjustedPointOfInterest:(CGPoint)adjustedPoint;
+
+@property (nonatomic) PBJExposureMode exposureMode;
+@property (nonatomic, readonly, getter=isExposureLockSupported) BOOL exposureLockSupported;
+- (void)exposeAtAdjustedPointOfInterest:(CGPoint)adjustedPoint;
 
 // photo
 
 @property (nonatomic, readonly) BOOL canCapturePhoto;
 - (void)capturePhoto;
 
-@property (nonatomic) BOOL thumbnailEnabled; // thumbnail generation, disabling reduces processing time for an photo
+@property (nonatomic) BOOL thumbnailEnabled; // thumbnail generation, disabling reduces processing time for a photo
 
 // video
 // use pause/resume if a session is in progress, end finalizes that recording session
@@ -130,6 +175,7 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 @property (nonatomic, readonly) EAGLContext *context;
 @property (nonatomic) CGRect presentationFrame;
 
+@property (nonatomic) CMTime maximumCaptureDuration; // automatically triggers vision:capturedVideo:error: after exceeding threshold, (kCMTimeInvalid records without threshold)
 @property (nonatomic, readonly) Float64 capturedAudioSeconds;
 @property (nonatomic, readonly) Float64 capturedVideoSeconds;
 
@@ -137,26 +183,35 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 - (void)pauseVideoCapture;
 - (void)resumeVideoCapture;
 - (void)endVideoCapture;
+- (void)cancelVideoCapture;
 
 @end
 
 @protocol PBJVisionDelegate <NSObject>
 @optional
 
+// session
+
 - (void)visionSessionWillStart:(PBJVision *)vision;
 - (void)visionSessionDidStart:(PBJVision *)vision;
 - (void)visionSessionDidStop:(PBJVision *)vision;
 
-- (void)visionCameraDeviceWillChange:(PBJVision*)vision;
-- (void)visionCameraDeviceDidChange:(PBJVision*)vision;
+// device / mode / format
 
-- (void)visionCameraModeWillChange:(PBJVision*)vision;
-- (void)visionCameraModeDidChange:(PBJVision*)vision;
+- (void)visionCameraDeviceWillChange:(PBJVision *)vision;
+- (void)visionCameraDeviceDidChange:(PBJVision *)vision;
 
-- (void)visionOutputFormatWillChange:(PBJVision*)vision;
-- (void)visionOutputFormatDidChange:(PBJVision*)vision;
+- (void)visionCameraModeWillChange:(PBJVision *)vision;
+- (void)visionCameraModeDidChange:(PBJVision *)vision;
+
+- (void)visionOutputFormatWillChange:(PBJVision *)vision;
+- (void)visionOutputFormatDidChange:(PBJVision *)vision;
 
 - (void)vision:(PBJVision *)vision didChangeCleanAperture:(CGRect)cleanAperture;
+
+- (void)visionDidChangeVideoFormatAndFrameRate:(PBJVision *)vision;
+
+// focus / exposure
 
 - (void)visionWillStartFocus:(PBJVision *)vision;
 - (void)visionDidStopFocus:(PBJVision *)vision;

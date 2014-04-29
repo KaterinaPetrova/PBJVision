@@ -3,7 +3,25 @@
 //  Vision
 //
 //  Created by Patrick Piemonte on 7/23/13.
-//  Copyright (c) 2013 Patrick Piemonte. All rights reserved.
+//
+//  Copyright (c) 2013-2014 Patrick Piemonte (http://patrickpiemonte.com)
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy of
+//  this software and associated documentation files (the "Software"), to deal in
+//  the Software without restriction, including without limitation the rights to
+//  use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+//  the Software, and to permit persons to whom the Software is furnished to do so,
+//  subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+//  FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+//  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+//  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+//  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
 #import "PBJViewController.h"
@@ -51,6 +69,7 @@
     
     UIButton *_flipButton;
     UIButton *_focusButton;
+    UIButton *_frameRateButton;
     UIButton *_onionButton;
     UIView *_captureDock;
 
@@ -205,9 +224,12 @@
     focusFrame.origin = CGPointMake((CGRectGetWidth(self.view.bounds) * 0.5f) - (focusImage.size.width * 0.5f), 16.0f);
     focusFrame.size = focusImage.size;
     _focusButton.frame = focusFrame;
-    
     [_focusButton addTarget:self action:@selector(_handleFocusButton:) forControlEvents:UIControlEventTouchUpInside];
     [_captureDock addSubview:_focusButton];
+    
+    if ([[PBJVision sharedInstance] supportsVideoFrameRate:120]) {
+        
+    }
     
     // onion button
     _onionButton = [ExtendedHitButton extendedHitButton];
@@ -305,6 +327,7 @@
         _flipButton.hidden = YES;
     }
     
+    //[vision setCaptureSessionPreset:AVCaptureSessionPreset640x480];
     [vision setCameraMode:PBJCameraModeVideo];
     [vision setCameraOrientation:PBJCameraOrientationPortrait];
     [vision setFocusMode:PBJFocusModeContinuousAutoFocus];
@@ -352,9 +375,15 @@
     }];
 }
 
+- (void)_handleFrameRateChangeButton:(UIButton *)button
+{
+    
+}
+
 - (void)_handleOnionSkinningButton:(UIButton *)button
 {
-    [_onionButton setSelected:!_onionButton.selected];
+    _onionButton.selected = !_onionButton.selected;
+    
     if (_recording)
         _effectsViewController.view.hidden = !_onionButton.selected;
 }
@@ -421,10 +450,12 @@
     [_focusView startAnimation];
 
     CGPoint adjustPoint = [PBJVisionUtilities convertToPointOfInterestFromViewCoordinates:tapPoint inFrame:_previewView.frame];
-    [[PBJVision sharedInstance] focusAtAdjustedPoint:adjustPoint];
+    [[PBJVision sharedInstance] focusExposeAndAdjustWhiteBalanceAtAdjustedPoint:adjustPoint];
 }
 
 #pragma mark - PBJVisionDelegate
+
+// session
 
 - (void)visionSessionWillStart:(PBJVision *)vision
 {
@@ -443,15 +474,20 @@
     [_previewView removeFromSuperview];
 }
 
-- (void)visionCameraModeWillChange:(PBJVision *)vision
+// preview
+
+- (void)visionSessionDidStartPreview:(PBJVision *)vision
 {
-    NSLog(@"Camera mode will change");
+    NSLog(@"Camera preview did start");
+    
 }
 
-- (void)visionCameraModeDidChange:(PBJVision *)vision
+- (void)visionSessionDidStopPreview:(PBJVision *)vision
 {
-    NSLog(@"Camera mode did change");
+    NSLog(@"Camera preview did stop");
 }
+
+// device
 
 - (void)visionCameraDeviceWillChange:(PBJVision *)vision
 {
@@ -462,6 +498,20 @@
 {
     NSLog(@"Camera device did change");
 }
+
+// mode
+
+- (void)visionCameraModeWillChange:(PBJVision *)vision
+{
+    NSLog(@"Camera mode will change");
+}
+
+- (void)visionCameraModeDidChange:(PBJVision *)vision
+{
+    NSLog(@"Camera mode did change");
+}
+
+// format
 
 - (void)visionOutputFormatWillChange:(PBJVision *)vision
 {
@@ -476,6 +526,8 @@
 - (void)vision:(PBJVision *)vision didChangeCleanAperture:(CGRect)cleanAperture
 {
 }
+
+// focus / exposure
 
 - (void)visionWillStartFocus:(PBJVision *)vision
 {
@@ -492,13 +544,17 @@
 {
 }
 
-- (void)visionDidChangeExposure:(PBJVision *)vision {
+- (void)visionDidChangeExposure:(PBJVision *)vision
+{
     if (_focusView && [_focusView superview]) {
         [_focusView stopAnimation];
     }
 }
 
-- (void)visionDidChangeFlashMode:(PBJVision *)vision {
+// flash
+
+- (void)visionDidChangeFlashMode:(PBJVision *)vision
+{
     NSLog(@"Flash mode did change");
 }
 
@@ -538,7 +594,10 @@
 {
     _recording = NO;
 
-    if (error) {
+    if (error && [error.domain isEqual:PBJVisionErrorDomain] && error.code == PBJVisionErrorCancelled) {
+        NSLog(@"recording session cancelled");
+        return;
+    } else if (error) {
         NSLog(@"encounted an error in video capture (%@)", error);
         return;
     }

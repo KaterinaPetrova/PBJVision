@@ -1,8 +1,8 @@
 //
-//  PBJStrobeView.h
+//  PBJGLProgram.h
 //  Vision
 //
-//  Created by Patrick Piemonte on 7/23/13.
+//  Created by Patrick Piemonte on 4/9/14.
 //
 //  Copyright (c) 2013-2014 Patrick Piemonte (http://patrickpiemonte.com)
 //
@@ -24,11 +24,26 @@
 //  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#import <UIKit/UIKit.h>
+#import <Foundation/Foundation.h>
+#import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES2/glext.h>
 
-@interface PBJStrobeView : UIView
+// common attribute names
+extern NSString * const PBJGLProgramAttributeVertex;
+extern NSString * const PBJGLProgramAttributeTextureCoord;
+extern NSString * const PBJGLProgramAttributeNormal;
 
-- (void)start;
-- (void)stop;
+// inspired by Jeff LaMarche, https://github.com/jlamarche/iOS-OpenGLES-Stuff
+@interface PBJGLProgram : NSObject
+
+- (id)initWithVertexShaderName:(NSString *)vertexShaderName fragmentShaderName:(NSString *)fragmentShaderName;
+
+- (void)addAttribute:(NSString *)attributeName;
+
+- (GLuint)attributeLocation:(NSString *)attributeName;
+- (int)uniformLocation:(NSString *)uniformName;
+
+- (BOOL)link;
+- (void)use;
 
 @end
