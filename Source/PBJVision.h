@@ -3,8 +3,7 @@
 //  Vision
 //
 //  Created by Patrick Piemonte on 4/30/13.
-//
-//  Copyright (c) 2013-2014 Patrick Piemonte (http://patrickpiemonte.com)
+//  Copyright (c) 2013-present, Patrick Piemonte, http://patrickpiemonte.com
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy of
 //  this software and associated documentation files (the "Software"), to deal in
@@ -64,6 +63,12 @@ typedef NS_ENUM(NSInteger, PBJFlashMode) {
     PBJFlashModeAuto = AVCaptureFlashModeAuto
 };
 
+typedef NS_ENUM(NSInteger, PBJMirroringMode) {
+	PBJMirroringAuto,
+	PBJMirroringOn,
+	PBJMirroringOff
+};
+
 typedef NS_ENUM(NSInteger, PBJAuthorizationStatus) {
     PBJAuthorizationStatusNotDetermined = 0,
     PBJAuthorizationStatusAuthorized,
@@ -73,7 +78,8 @@ typedef NS_ENUM(NSInteger, PBJAuthorizationStatus) {
 typedef NS_ENUM(NSInteger, PBJOutputFormat) {
     PBJOutputFormatPreset = 0,
     PBJOutputFormatSquare,
-    PBJOutputFormatWidescreen
+    PBJOutputFormatWidescreen,
+    PBJOutputFormatStandard /* 4:3 */
 };
 
 // PBJError
@@ -83,7 +89,9 @@ extern NSString * const PBJVisionErrorDomain;
 typedef NS_ENUM(NSInteger, PBJVisionErrorType)
 {
     PBJVisionErrorUnknown = -1,
-    PBJVisionErrorCancelled = 100
+    PBJVisionErrorCancelled = 100,
+    PBJVisionErrorSessionFailed = 101,
+    PBJVisionErrorBadOutputFile = 102
 };
 
 // photo dictionary keys
@@ -97,6 +105,17 @@ extern NSString * const PBJVisionPhotoThumbnailKey; // 160x120
 
 extern NSString * const PBJVisionVideoPathKey;
 extern NSString * const PBJVisionVideoThumbnailKey;
+extern NSString * const PBJVisionVideoThumbnailArrayKey;
+extern NSString * const PBJVisionVideoCapturedDurationKey; // Captured duration in seconds
+
+// suggested videoBitRate constants
+
+static CGFloat const PBJVideoBitRate480x360 = 87500 * 8;
+static CGFloat const PBJVideoBitRate640x480 = 437500 * 8;
+static CGFloat const PBJVideoBitRate1280x720 = 1312500 * 8;
+static CGFloat const PBJVideoBitRate1920x1080 = 2975000 * 8;
+static CGFloat const PBJVideoBitRate960x540 = 3750000 * 8;
+static CGFloat const PBJVideoBitRate1280x750 = 5000000 * 8;
 
 @class EAGLContext;
 @protocol PBJVisionDelegate;
@@ -120,12 +139,19 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 @property (nonatomic) PBJFlashMode flashMode; // flash and torch
 @property (nonatomic, readonly, getter=isFlashAvailable) BOOL flashAvailable;
 
-// video output/compression settings
+@property (nonatomic) PBJMirroringMode mirroringMode;
 
-@property (nonatomic, strong) NSString *captureSessionPreset;
+// video output settings
+
+@property (nonatomic, copy) NSString *captureSessionPreset;
+@property (nonatomic, copy) NSString *captureDirectory;
 @property (nonatomic) PBJOutputFormat outputFormat;
+
+// video compression settings
+
 @property (nonatomic) CGFloat videoBitRate;
 @property (nonatomic) NSInteger audioBitRate;
+@property (nonatomic) NSDictionary *additionalCompressionProperties;
 
 // video frame rate (adjustment may change the capture format (AVCaptureDeviceFormat : FoV, zoom factor, etc)
 
@@ -135,6 +161,8 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 // preview
 
 @property (nonatomic, readonly) AVCaptureVideoPreviewLayer *previewLayer;
+@property (nonatomic) BOOL autoUpdatePreviewOrientation;
+@property (nonatomic) PBJCameraOrientation previewOrientation;
 @property (nonatomic, readonly) CGRect cleanAperture;
 
 - (void)startPreview;
@@ -161,8 +189,6 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 @property (nonatomic, readonly) BOOL canCapturePhoto;
 - (void)capturePhoto;
 
-@property (nonatomic) BOOL thumbnailEnabled; // thumbnail generation, disabling reduces processing time for a photo
-
 // video
 // use pause/resume if a session is in progress, end finalizes that recording session
 
@@ -172,6 +198,8 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 @property (nonatomic, readonly, getter=isPaused) BOOL paused;
 
 @property (nonatomic, getter=isVideoRenderingEnabled) BOOL videoRenderingEnabled;
+@property (nonatomic, getter=isAudioCaptureEnabled) BOOL audioCaptureEnabled;
+
 @property (nonatomic, readonly) EAGLContext *context;
 @property (nonatomic) CGRect presentationFrame;
 
@@ -185,6 +213,15 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 - (void)endVideoCapture;
 - (void)cancelVideoCapture;
 
+// thumbnails
+
+@property (nonatomic) BOOL thumbnailEnabled; // thumbnail generation, disabling reduces processing time for a photo or video
+@property (nonatomic) BOOL defaultVideoThumbnails; // capture first and last frames of video
+
+- (void)captureCurrentVideoThumbnail;
+- (void)captureVideoThumbnailAtFrame:(int64_t)frame;
+- (void)captureVideoThumbnailAtTime:(Float64)seconds;
+
 @end
 
 @protocol PBJVisionDelegate <NSObject>
@@ -195,6 +232,9 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 - (void)visionSessionWillStart:(PBJVision *)vision;
 - (void)visionSessionDidStart:(PBJVision *)vision;
 - (void)visionSessionDidStop:(PBJVision *)vision;
+
+- (void)visionSessionWasInterrupted:(PBJVision *)vision;
+- (void)visionSessionInterruptionEnded:(PBJVision *)vision;
 
 // device / mode / format
 
@@ -239,6 +279,7 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 
 // video
 
+- (NSString *)vision:(PBJVision *)vision willStartVideoCaptureToFile:(NSString *)fileName;
 - (void)visionDidStartVideoCapture:(PBJVision *)vision;
 - (void)visionDidPauseVideoCapture:(PBJVision *)vision; // stopped but not ended
 - (void)visionDidResumeVideoCapture:(PBJVision *)vision;
@@ -246,7 +287,7 @@ extern NSString * const PBJVisionVideoThumbnailKey;
 
 // video capture progress
 
-- (void)visionDidCaptureVideoSample:(PBJVision *)vision;
-- (void)visionDidCaptureAudioSample:(PBJVision *)vision;
+- (void)vision:(PBJVision *)vision didCaptureVideoSampleBuffer:(CMSampleBufferRef)sampleBuffer;
+- (void)vision:(PBJVision *)vision didCaptureAudioSample:(CMSampleBufferRef)sampleBuffer;
 
 @end

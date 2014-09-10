@@ -3,8 +3,7 @@
 //  Vision
 //
 //  Created by Patrick Piemonte on 5/20/13.
-//
-//  Copyright (c) 2013-2014 Patrick Piemonte (http://patrickpiemonte.com)
+//  Copyright (c) 2013-present, Patrick Piemonte, http://patrickpiemonte.com
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy of
 //  this software and associated documentation files (the "Software"), to deal in
@@ -34,7 +33,7 @@
     CGPoint pointOfInterest = CGPointMake(.5f, .5f);
     CGSize frameSize = frame.size;
     
-    switch ([[PBJVision sharedInstance] cameraOrientation]) {
+    switch ([[PBJVision sharedInstance] previewOrientation]) {
         case PBJCameraOrientationPortrait:
             break;
         case PBJCameraOrientationPortraitUpsideDown:

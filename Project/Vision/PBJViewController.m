@@ -3,8 +3,7 @@
 //  Vision
 //
 //  Created by Patrick Piemonte on 7/23/13.
-//
-//  Copyright (c) 2013-2014 Patrick Piemonte (http://patrickpiemonte.com)
+//  Copyright (c) 2013-present, Patrick Piemonte, http://patrickpiemonte.com
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy of
 //  this software and associated documentation files (the "Software"), to deal in
@@ -81,7 +80,7 @@
     UILabel *_instructionLabel;
     UIView *_gestureView;
     UILongPressGestureRecognizer *_longPressGestureRecognizer;
-    UITapGestureRecognizer *_tapGestureRecognizer;
+    UITapGestureRecognizer *_focusTapGestureRecognizer;
     
     BOOL _recording;
 
@@ -130,8 +129,8 @@
 
     // done button
     _doneButton = [ExtendedHitButton extendedHitButton];
-    _doneButton.frame = CGRectMake(viewWidth - 20.0f - 20.0f, 20.0f, 20.0f, 20.0f);
-    UIImage *buttonImage = [UIImage imageNamed:@"capture_yep"];
+    _doneButton.frame = CGRectMake(viewWidth - 25.0f - 15.0f, 18.0f, 25.0f, 25.0f);
+    UIImage *buttonImage = [UIImage imageNamed:@"capture_done"];
     [_doneButton setImage:buttonImage forState:UIControlStateNormal];
     [_doneButton addTarget:self action:@selector(_handleDoneButton:) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:_doneButton];
@@ -183,11 +182,11 @@
     _longPressGestureRecognizer.allowableMovement = 10.0f;
     
     // tap to focus
-    _tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_handleFocusTapGesterRecognizer:)];
-    _tapGestureRecognizer.delegate = self;
-    _tapGestureRecognizer.numberOfTapsRequired = 1;
-    _tapGestureRecognizer.enabled = NO;
-    [_previewView addGestureRecognizer:_tapGestureRecognizer];
+    _focusTapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_handleFocusTapGesterRecognizer:)];
+    _focusTapGestureRecognizer.delegate = self;
+    _focusTapGestureRecognizer.numberOfTapsRequired = 1;
+    _focusTapGestureRecognizer.enabled = NO;
+    [_previewView addGestureRecognizer:_focusTapGestureRecognizer];
     
     // gesture view to record
     _gestureView = [[UIView alloc] initWithFrame:CGRectZero];
@@ -196,6 +195,7 @@
     gestureFrame.size.height -= (40.0f + 85.0f);
     _gestureView.frame = gestureFrame;
     [self.view addSubview:_gestureView];
+    
     [_gestureView addGestureRecognizer:_longPressGestureRecognizer];
 
     // bottom dock
@@ -228,7 +228,7 @@
     [_captureDock addSubview:_focusButton];
     
     if ([[PBJVision sharedInstance] supportsVideoFrameRate:120]) {
-        
+        // set faster frame rate
     }
     
     // onion button
@@ -320,19 +320,19 @@
     vision.delegate = self;
 
     if ([vision isCameraDeviceAvailable:PBJCameraDeviceBack]) {
-        [vision setCameraDevice:PBJCameraDeviceBack];
+        vision.cameraDevice = PBJCameraDeviceBack;
         _flipButton.hidden = NO;
     } else {
-        [vision setCameraDevice:PBJCameraDeviceFront];
+        vision.cameraDevice = PBJCameraDeviceFront;
         _flipButton.hidden = YES;
     }
     
-    //[vision setCaptureSessionPreset:AVCaptureSessionPreset640x480];
-    [vision setCameraMode:PBJCameraModeVideo];
-    [vision setCameraOrientation:PBJCameraOrientationPortrait];
-    [vision setFocusMode:PBJFocusModeContinuousAutoFocus];
-    [vision setOutputFormat:PBJOutputFormatSquare];
-    [vision setVideoRenderingEnabled:YES];
+    vision.cameraMode = PBJCameraModeVideo;
+    vision.cameraOrientation = PBJCameraOrientationPortrait;
+    vision.focusMode = PBJFocusModeContinuousAutoFocus;
+    vision.outputFormat = PBJOutputFormatSquare;
+    vision.videoRenderingEnabled = YES;
+    vision.additionalCompressionProperties = @{AVVideoProfileLevelKey : AVVideoProfileLevelH264Baseline30}; // AVVideoProfileLevelKey requires specific captureSessionPreset
 }
 
 #pragma mark - UIButton
@@ -340,11 +340,7 @@
 - (void)_handleFlipButton:(UIButton *)button
 {
     PBJVision *vision = [PBJVision sharedInstance];
-    if (vision.cameraDevice == PBJCameraDeviceBack) {
-        [vision setCameraDevice:PBJCameraDeviceFront];
-    } else {
-        [vision setCameraDevice:PBJCameraDeviceBack];
-    }
+    vision.cameraDevice = vision.cameraDevice == PBJCameraDeviceBack ? PBJCameraDeviceFront : PBJCameraDeviceBack;
 }
 
 - (void)_handleFocusButton:(UIButton *)button
@@ -352,14 +348,14 @@
     _focusButton.selected = !_focusButton.selected;
     
     if (_focusButton.selected) {
-        _tapGestureRecognizer.enabled = YES;
+        _focusTapGestureRecognizer.enabled = YES;
         _gestureView.hidden = YES;
 
     } else {
         if (_focusView && [_focusView superview]) {
             [_focusView stopAnimation];
         }
-        _tapGestureRecognizer.enabled = NO;
+        _focusTapGestureRecognizer.enabled = NO;
         _gestureView.hidden = NO;
     }
     
@@ -570,6 +566,7 @@
 
 - (void)vision:(PBJVision *)vision capturedPhoto:(NSDictionary *)photoDict error:(NSError *)error
 {
+    // photo captured, PBJVisionPhotoJPEGKey
 }
 
 // video capture
@@ -606,7 +603,7 @@
     
     NSString *videoPath = [_currentVideo  objectForKey:PBJVisionVideoPathKey];
     [_assetLibrary writeVideoAtPathToSavedPhotosAlbum:[NSURL URLWithString:videoPath] completionBlock:^(NSURL *assetURL, NSError *error1) {
-        UIAlertView *alert = [[UIAlertView alloc] initWithTitle: @"Saved!" message: @"Saved to the camera roll."
+        UIAlertView *alert = [[UIAlertView alloc] initWithTitle: @"Video Saved!" message: @"Saved to the camera roll."
                                                        delegate:self
                                               cancelButtonTitle:nil
                                               otherButtonTitles:@"OK", nil];

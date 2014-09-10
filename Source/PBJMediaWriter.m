@@ -3,8 +3,7 @@
 //  Vision
 //
 //  Created by Patrick Piemonte on 1/27/14.
-//
-//  Copyright (c) 2013-2014 Patrick Piemonte (http://patrickpiemonte.com)
+//  Copyright (c) 2013-present, Patrick Piemonte, http://patrickpiemonte.com
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy of
 //  this software and associated documentation files (the "Software"), to deal in
@@ -101,19 +100,22 @@
         _videoTimestamp = kCMTimeInvalid;
 
         // It's possible to capture video without audio or audio without video.
-        // If the user has denied access to a device, we don't need to set it up
+        // If the user has denied access to a device, or hasn't even been asked, we don't need to set it up
         if ([[AVCaptureDevice class] respondsToSelector:@selector(authorizationStatusForMediaType:)]) {
+            AVAuthorizationStatus audioAuthorizationStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
             
-            if ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio] == AVAuthorizationStatusDenied) {
+            if (audioAuthorizationStatus == AVAuthorizationStatusNotDetermined || audioAuthorizationStatus == AVAuthorizationStatusDenied) {
                 _audioReady = YES;
-                if ([_delegate respondsToSelector:@selector(mediaWriterDidObserveAudioAuthorizationStatusDenied:)]) {
+                if (audioAuthorizationStatus == AVAuthorizationStatusDenied && [_delegate respondsToSelector:@selector(mediaWriterDidObserveAudioAuthorizationStatusDenied:)]) {
                     [_delegate mediaWriterDidObserveAudioAuthorizationStatusDenied:self];
                 }
             }
             
-            if ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo] == AVAuthorizationStatusDenied) {
+            AVAuthorizationStatus videoAuthorizationStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+            
+            if (videoAuthorizationStatus == AVAuthorizationStatusNotDetermined || videoAuthorizationStatus == AVAuthorizationStatusDenied) {
                 _videoReady = YES;
-                if ([_delegate respondsToSelector:@selector(mediaWriterDidObserveVideoAuthorizationStatusDenied:)]) {
+                if (videoAuthorizationStatus == AVAuthorizationStatusDenied && [_delegate respondsToSelector:@selector(mediaWriterDidObserveVideoAuthorizationStatusDenied:)]) {
                     [_delegate mediaWriterDidObserveVideoAuthorizationStatusDenied:self];
                 }
             }
@@ -139,7 +141,10 @@
     AVMutableMetadataItem *softwareItem = [[AVMutableMetadataItem alloc] init];
     [softwareItem setKeySpace:AVMetadataKeySpaceCommon];
     [softwareItem setKey:AVMetadataCommonKeySoftware];
-    [softwareItem setValue:[NSString stringWithFormat:@"%@ %@ PBJVision", [currentDevice systemName], [currentDevice systemVersion]]];
+    NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"];
+    NSString *appVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    NSString *softwareName = [NSString stringWithFormat:@"%@ %@ PBJVision %@ %@", [currentDevice systemName], [currentDevice systemVersion], appName, appVersion];
+    [softwareItem setValue:softwareName];
 
     // creation date
     AVMutableMetadataItem *creationDateItem = [[AVMutableMetadataItem alloc] init];

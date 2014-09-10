@@ -2,9 +2,11 @@
 
 ## Vision
 
-Vision is an iOS camera engine that supports touch-to-record video, slow motion video (120 fps for supporting hardware, which is currently only iPhone 5S), and photo capture. It is compatible with both iOS 6 and iOS 7 and supports 64-bit. Pause and resume video capture is also possible without having to use a touch gesture as the sample project provides.
+Vision is an iOS camera engine that supports touch-to-record video, slow motion video (120 fps for supporting hardware, which is currently only iPhone 5S), and photo capture. It is compatible with both iOS 7 and iOS 8 but also supports 64-bit. Pause and resume video capture is also possible without having to use a touch gesture as the sample project provides.
 
-I created this component at [DIY.org](http://diy.org) as a fun means for young people to author video. This same recording interaction was pioneered by [Vine](http://vine.co) and also later adopted by [Instagram](http://instagram.com).
+iOS 6 is supported in versions v0.3.2 and below but may slowly start dropping support future.
+
+I created this component at [DIY](http://diy.org) as a fun means for kids to author video and share their skills. This same recording interaction was pioneered by [Vine](http://vine.co) and also [Instagram](http://instagram.com).
 
 Please review the [release history](https://github.com/piemonte/PBJVision/releases) for a summary of the latest changes and more information.
 
@@ -87,14 +89,12 @@ pod 'PBJVision'
 
 ## Resources
 
-External links that may be useful:
-
 * [AV Foundation Programming Guide](https://developer.apple.com/library/ios/documentation/AudioVideo/Conceptual/AVFoundationPG/Articles/00_Introduction.html)
 * [PBJVideoPlayer, a simple iOS video player](https://github.com/piemonte/PBJVideoPlayer)
 
 ## Contributing
 
-See the [CONTRIBUTING](https://github.com/piemonte/PBJVision/blob/master/CONTRIBUTING.md) file for information on how to collaborate and help out. The [github issues page](https://github.com/piemonte/PBJVision/issues) is a great place to start a discussion and also allows others to benefit and chime-in too.
+See the [CONTRIBUTING](https://github.com/piemonte/PBJVision/blob/master/CONTRIBUTING.md) file for information on how to collaborate and help out. The [github issues page](https://github.com/piemonte/PBJVision/issues) is a the place to file a bug, [Stack Overflow](http://stackoverflow.com/questions/tagged/pbjvision) is a great place to start a discussion and also allows others to benefit and chime-in too.
 
 ## License
 
