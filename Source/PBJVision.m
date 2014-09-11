@@ -2146,11 +2146,11 @@ typedef void (^PBJVisionBlock)();
             }
             
             // process the sample buffer for rendering
-            if (_flags.videoRenderingEnabled && _flags.videoWritten) {
-                [self _executeBlockOnMainQueue:^{
-                    [self _processSampleBuffer:bufferToWrite];
-                }];
-            }
+//            if (_flags.videoRenderingEnabled && _flags.videoWritten) {
+//                [self _executeBlockOnMainQueue:^{
+//                    [self _processSampleBuffer:bufferToWrite];
+//                }];
+//            }
             
             [self _enqueueBlockOnMainQueue:^{
                 if ([_delegate respondsToSelector:@selector(vision:didCaptureVideoSampleBuffer:)]) {
