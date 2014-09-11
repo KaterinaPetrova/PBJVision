@@ -172,6 +172,7 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
         unsigned int thumbnailEnabled:1;
         unsigned int shouldResumeRecording:1;
         unsigned int defaultVideoThumbnails:1;
+        unsigned int frameRequested:1;
     } __block _flags;
 }
 
@@ -736,6 +737,11 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
     [self _destroyCamera];
 }
 
+
+- (void)captureVideoFrame {
+    _flags.frameRequested = YES;
+}
+
 #pragma mark - queue helper methods
 
 typedef void (^PBJVisionBlock)();
@@ -1089,9 +1095,9 @@ typedef void (^PBJVisionBlock)();
 
         NSDictionary *videoSettings = nil;
         if (supportsFullRangeYUV) {
-            videoSettings = @{ (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) };
+            videoSettings = @{ (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA) };
         } else if (supportsVideoRangeYUV) {
-            videoSettings = @{ (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange) };
+            videoSettings = @{ (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA) };
         }
         if (videoSettings)
             [_captureOutputVideo setVideoSettings:videoSettings];
@@ -2021,6 +2027,48 @@ typedef void (^PBJVisionBlock)();
         DLog(@"sample buffer data is not ready");
         CFRelease(sampleBuffer);
         return;
+    }
+    
+    if (_flags.frameRequested) {
+        _flags.frameRequested = NO;
+        
+        CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+        CVPixelBufferLockBaseAddress(imageBuffer,0);
+        uint8_t *baseAddress = (uint8_t *)CVPixelBufferGetBaseAddress(imageBuffer);
+        size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
+        size_t width = CVPixelBufferGetWidth(imageBuffer);
+        size_t height = CVPixelBufferGetHeight(imageBuffer);
+        
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+        CGContextRef newContext = CGBitmapContextCreate(baseAddress, width, height, 8, bytesPerRow, colorSpace, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+        CGContextSetInterpolationQuality(newContext, kCGInterpolationHigh); //Give the context a hint that we want high quality during the scale
+        CGImageRef newImage = CGBitmapContextCreateImage(newContext);
+        
+        CGRect cropRect = CGRectMake(0, 0, width, height);
+        if (_outputFormat == PBJOutputFormatSquare) {
+            uint min = MIN(width, height);
+            cropRect.size.width = min;
+            cropRect.size.height = min;
+            cropRect.origin.x = (width - min) / 2;
+            cropRect.origin.y = (height - min) / 2;
+        }
+        
+        CGImageRef cropRectImage = CGImageCreateWithImageInRect(newImage, cropRect);
+        CGContextRelease(newContext);
+        CGColorSpaceRelease(colorSpace);
+        
+        UIImage *image = [UIImage imageWithCGImage:cropRectImage];
+        
+        CGImageRelease(newImage);
+        
+        CVPixelBufferUnlockBaseAddress(imageBuffer,0);
+        
+        [self _executeBlockOnMainQueue:^{
+            
+            if ([_delegate respondsToSelector:@selector(vision:capturedFrame:)]) {
+                [_delegate vision:self capturedFrame:image];
+            }
+        }];
     }
 
     if (!_flags.recording || _flags.paused) {
